@@ -53,9 +53,18 @@ uint8_t binaryMsgArray[NUM_TEST_MSG][MAX_MSG] = {
     };
 // End Test Data
 
+typedef enum {
+   MSG_TYPE_UNKNOWN,
+   MSG_TYPE_STRING,
+   MSG_TYPE_BINARY,
+   NUM_MSG_TYPE,
+} MessageType;
+
 // Local Data Types
 typedef struct {
     uint16_t messageID;
+    uint8_t messageType;
+    uint16_t messageLen;
     char msg[MAX_MSG];
     uint32_t crc;
 } Message;
@@ -84,7 +93,7 @@ int main()
     {
         // ################## TRANSMITTER MODULE ###############################
         // Prepare for transmission
-        buildMessage(&messageTx, stringMsgArray[index%NUM_TEST_MSG]);
+        buildMessage(&messageTx, stringMsgArray[index%NUM_TEST_MSG], MSG_TYPE_STRING);
     
         // Simulate transmission 
         simTx(&messageTx);
@@ -95,9 +104,7 @@ int main()
         if (true == decodeMessage(&messageRx, rxBuffer))
         {
             // Print the decoded message
-            printf("Message #%d (CRC: 0x%08X, %3lu bytes): %s\n", 
-             messageRx.messageID, messageRx.crc, 
-             strlen(messageRx.msg), messageRx.msg );
+            printMessage(messageRx);
         }
         else
         {
@@ -109,16 +116,40 @@ int main()
     return errorCount;
 }
 
+// printMessage
+// Prints message to command line output
+void printMessage(Message msg)
+{
+    // Print the decoded message
+    printf("Message #%d (CRC: 0x%08X, %3lu bytes): ",
+    msg.messageID, msg.crc,
+    strlen(msg.msg));
+    if(msg.messageType == MSG_TYPE_STRING)
+    {
+        printf("%s\n", msg.msg);
+    }
+    else
+    {
+        int i;
+        for(i = 0; i < msg.messageLen; i++)
+        {
+            printf("0x%x ", msg.msg[i]);
+        }
+    }
+}
+
 // buildMessage 
 // Create a message structure for transmission via simulated modem
-void buildMessage(Message *msgToSend, char *payload)
+void buildMessage(Message *msgToSend, char *payload, MessageType msgType)
 {
     
     static uint16_t messageCount = 0;
     uint32_t crc;
 
     msgToSend->messageID = ++messageCount;
-    memcpy(msgToSend->msg, payload, strlen(payload));
+    msgToSend->messageLen = strlen(payload);
+    msgToSend->messageType = msgType;
+    memcpy(msgToSend->msg, payload, msgToSend->messageLen);
     
     crc = crc32((uint8_t *)msgToSend, (MAX_MSG + 2));
     msgToSend->crc = crc;
